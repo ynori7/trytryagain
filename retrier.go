@@ -45,10 +45,8 @@ func NewRetrier(options ...RetrierOption) *Retrier {
 func (t *Retrier) Do(ctx context.Context, action ActionFunc) error {
 
 	for attempts := uint(0); attempts < t.maxAttempts; attempts++ {
-		if attempts > 0 {
-			//sleep for a bit to avoid bombarding the requested resource
-			time.Sleep(t.backoff(ctx, attempts))
-		}
+		//sleep for a bit to avoid bombarding the requested resource. The backoff func should return 0 for the first attempt
+		time.Sleep(t.backoff(ctx, attempts))
 
 		//check if the context was cancelled
 		select {
