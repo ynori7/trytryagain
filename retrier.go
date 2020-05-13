@@ -22,14 +22,14 @@ type (
 	ActionFunc  func() (err error, retriable bool)
 )
 
-type retrier struct {
+type Retrier struct {
 	maxAttempts uint
 	backoff     BackoffFunc
 	onError     OnErrorFunc
 }
 
-// NewRetrier returns a new retrier with the specified options
-func NewRetrier(options ...retrierOption) *retrier {
+// NewRetrier returns a new Retrier with the specified options
+func NewRetrier(options ...retrierOption) *Retrier {
 	t := defaultRetrier()
 
 	for _, opt := range options {
@@ -41,7 +41,7 @@ func NewRetrier(options ...retrierOption) *retrier {
 
 // Do performs the specified action and retries with backoff in case of failures until the request either succeeds
 // or the maximum number of retries has been reached.
-func (t *retrier) Do(ctx context.Context, action ActionFunc) error {
+func (t *Retrier) Do(ctx context.Context, action ActionFunc) error {
 
 	for attempts := uint(0); attempts < t.maxAttempts; attempts++ {
 		if attempts > 0 {
