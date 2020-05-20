@@ -49,10 +49,8 @@ func (t *Retrier) Do(ctx context.Context, action ActionFunc) error {
 		time.Sleep(t.backoff(ctx, attempts))
 
 		//check if the context was cancelled
-		select {
-		case <-ctx.Done():
+		if IsContextDone(ctx) {
 			return ErrContextCanceled
-		default:
 		}
 
 		err, retriable := action()
@@ -61,6 +59,11 @@ func (t *Retrier) Do(ctx context.Context, action ActionFunc) error {
 		}
 
 		t.onError(err) //allow the user to handle/log the error
+
+		//it can happen that the context is canceled during the request
+		if IsCanceledContextError(err) {
+			return ErrContextCanceled
+		}
 
 		if !retriable {
 			return ErrRequestNotRetriable
