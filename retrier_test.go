@@ -132,3 +132,34 @@ func Test_DoWithRetries_ContextCanceledAfterFirstAttempt(t *testing.T) {
 	assert.Equal(t, 1, actionCalledCount)
 	assert.Equal(t, 1, errCalledCount)
 }
+
+func Test_DoWithRetries_ContextCanceledButWeIgnore(t *testing.T) {
+	// given
+	ctx, cancel := context.WithCancel(context.Background())
+	actionCalledCount := 0
+	action := func() (error, bool) {
+		actionCalledCount++
+		cancel()
+		return fmt.Errorf("something went wrong"), true
+	}
+
+	errCalledCount := 0
+	onError := func(err error) {
+		errCalledCount++
+		fmt.Println("Got an error: ", err.Error())
+	}
+
+	tr := NewRetrier(
+		WithOnError(onError),
+		WithIgnoreCtx(true),
+	)
+
+	// when
+	err := tr.Do(ctx, action)
+
+	// then
+	require.Error(t, err)
+	assert.EqualError(t, ErrNotSuccessful, err.Error())
+	assert.Equal(t, 3, actionCalledCount)
+	assert.Equal(t, 3, errCalledCount)
+}

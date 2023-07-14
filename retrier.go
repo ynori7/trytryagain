@@ -27,6 +27,7 @@ type Retrier struct {
 	maxAttempts uint
 	backoff     BackoffFunc
 	onError     OnErrorFunc
+	ignoreCtx   bool
 }
 
 // NewRetrier returns a new Retrier with the specified options
@@ -49,7 +50,7 @@ func (t *Retrier) Do(ctx context.Context, action ActionFunc) error {
 		time.Sleep(t.backoff(ctx, attempts))
 
 		//check if the context was cancelled
-		if IsContextDone(ctx) {
+		if IsContextDone(ctx) && !t.ignoreCtx {
 			return ErrContextCanceled
 		}
 
@@ -61,7 +62,7 @@ func (t *Retrier) Do(ctx context.Context, action ActionFunc) error {
 		t.onError(err) //allow the user to handle/log the error
 
 		//it can happen that the context is canceled during the request
-		if IsCanceledContextError(err) {
+		if IsCanceledContextError(err) && !t.ignoreCtx {
 			return ErrContextCanceled
 		}
 
