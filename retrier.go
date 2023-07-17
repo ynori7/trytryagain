@@ -20,14 +20,17 @@ type (
 	OnErrorFunc func(err error)
 	// ActionFunc is the function which is called and retried in case of a failure
 	ActionFunc func() (err error, retriable bool)
+	// ErrorHandler is a function which is called before returning an error
+	ErrorHandler func(retrierErr, actionErr error) error
 )
 
 // Retrier performs a specified action with retry logic based on its configuration
 type Retrier struct {
-	maxAttempts uint
-	backoff     BackoffFunc
-	onError     OnErrorFunc
-	ignoreCtx   bool
+	maxAttempts  uint
+	backoff      BackoffFunc
+	onError      OnErrorFunc
+	ignoreCtx    bool
+	errorHandler ErrorHandler
 }
 
 // NewRetrier returns a new Retrier with the specified options
@@ -44,7 +47,7 @@ func NewRetrier(options ...RetrierOption) *Retrier {
 // Do performs the specified action and retries with backoff in case of failures until the request either succeeds
 // or the maximum number of retries has been reached.
 func (t *Retrier) Do(ctx context.Context, action ActionFunc) error {
-
+	var actionErr error
 	for attempts := uint(0); attempts < t.maxAttempts; attempts++ {
 		//sleep for a bit to avoid bombarding the requested resource. The backoff func should return 0 for the first attempt
 		time.Sleep(t.backoff(ctx, attempts))
@@ -63,13 +66,15 @@ func (t *Retrier) Do(ctx context.Context, action ActionFunc) error {
 
 		//it can happen that the context is canceled during the request
 		if IsCanceledContextError(err) && !t.ignoreCtx {
-			return ErrContextCanceled
+			return t.errorHandler(ErrContextCanceled, err)
 		}
 
 		if !retriable {
-			return ErrRequestNotRetriable
+			return t.errorHandler(ErrRequestNotRetriable, err)
 		}
+
+		actionErr = err
 	}
 
-	return ErrNotSuccessful
+	return t.errorHandler(ErrNotSuccessful, actionErr)
 }
