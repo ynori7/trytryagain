@@ -92,7 +92,7 @@ func Test_DoWithRetries(t *testing.T) {
 			require.NoError(t, err, testcase)
 		} else {
 			require.Error(t, err, testcase)
-			assert.EqualError(t, testdata.expectedFinalErr, err.Error())
+			assert.EqualError(t, err, testdata.expectedFinalErr.Error())
 		}
 
 		assert.Equal(t, testdata.expectedActionCount, actionCalledCount)
@@ -128,7 +128,7 @@ func Test_DoWithRetries_ContextCanceledAfterFirstAttempt(t *testing.T) {
 
 	// then
 	require.Error(t, err)
-	assert.EqualError(t, ErrContextCanceled, err.Error())
+	assert.EqualError(t, err, ErrContextCanceled.Error())
 	assert.Equal(t, 1, actionCalledCount)
 	assert.Equal(t, 1, errCalledCount)
 }
@@ -159,7 +159,102 @@ func Test_DoWithRetries_ContextCanceledButWeIgnore(t *testing.T) {
 
 	// then
 	require.Error(t, err)
-	assert.EqualError(t, ErrNotSuccessful, err.Error())
+	assert.EqualError(t, err, ErrNotSuccessful.Error())
 	assert.Equal(t, 3, actionCalledCount)
 	assert.Equal(t, 3, errCalledCount)
+}
+
+func Test_DoWithRetriesPassThroughError(t *testing.T) {
+	// given
+	var (
+		actionCalledCount int
+		errCalledCount    int
+	)
+
+	resetCounts := func() {
+		actionCalledCount = 0
+		errCalledCount = 0
+	}
+
+	defaultOnError := func(err error) {
+		errCalledCount++
+		fmt.Println("Got an error: ", err.Error())
+	}
+
+	testcases := map[string]struct {
+		action              ActionFunc
+		onErr               OnErrorFunc
+		expectedActionCount int
+		expectedErrCount    int
+		expectedFinalErr    error
+	}{
+		"Success after some errors": {
+			action: func() (error, bool) {
+				actionCalledCount++
+				if actionCalledCount > 2 {
+					return nil, false
+				}
+				return fmt.Errorf("something went wrong"), true
+			},
+			onErr:               defaultOnError,
+			expectedActionCount: 3,
+			expectedErrCount:    2,
+			expectedFinalErr:    nil,
+		},
+		"Immediate success": {
+			action: func() (error, bool) {
+				actionCalledCount++
+				return nil, false
+			},
+			onErr:               defaultOnError,
+			expectedActionCount: 1,
+			expectedErrCount:    0,
+			expectedFinalErr:    nil,
+		},
+		"Non-retriable error": {
+			action: func() (error, bool) {
+				actionCalledCount++
+				return fmt.Errorf("something went wrong"), false
+			},
+			onErr:               defaultOnError,
+			expectedActionCount: 1,
+			expectedErrCount:    1,
+			expectedFinalErr:    fmt.Errorf("something went wrong"),
+		},
+		"Failure": {
+			action: func() (error, bool) {
+				actionCalledCount++
+				return fmt.Errorf("something went wrong"), true
+			},
+			onErr:               defaultOnError,
+			expectedActionCount: 4,
+			expectedErrCount:    4,
+			expectedFinalErr:    fmt.Errorf("something went wrong"),
+		},
+	}
+
+	for testcase, testdata := range testcases {
+		// when
+		tr := NewRetrier(
+			WithMaxAttempts(4),
+			WithOnError(testdata.onErr),
+			WithBackoff(exponentialBackoff),
+			WithPassThroughErrorHandler(),
+		)
+		err := tr.Do(context.Background(), testdata.action)
+
+		// then
+		if testdata.expectedFinalErr == nil {
+			require.NoError(t, err, testcase)
+		} else {
+			require.Error(t, err, testcase)
+			assert.EqualError(t, err, testdata.expectedFinalErr.Error())
+		}
+
+		assert.Equal(t, testdata.expectedActionCount, actionCalledCount)
+		assert.Equal(t, testdata.expectedErrCount, errCalledCount)
+
+		// cleanup
+		resetCounts()
+	}
 }

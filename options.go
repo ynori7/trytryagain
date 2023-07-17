@@ -1,10 +1,11 @@
 package trytryagain
 
 var (
-	_defaultMaxAttmpts = uint(3)
-	_defaultBackoff    = exponentialBackoff
-	_defaultOnError    = func(err error) {}
-	_defaultIgnoreCtx  = false
+	_defaultMaxAttmpts   = uint(3)
+	_defaultBackoff      = exponentialBackoff
+	_defaultOnError      = func(err error) {}
+	_defaultIgnoreCtx    = false
+	_defaultErrorHandler = func(retrierErr, actionErr error) error { return retrierErr }
 )
 
 // RetrierOption is a callback for specifying configuration options for a Retrier
@@ -12,10 +13,11 @@ type RetrierOption func(t *Retrier)
 
 func defaultRetrier() *Retrier {
 	return &Retrier{
-		maxAttempts: _defaultMaxAttmpts,
-		backoff:     _defaultBackoff,
-		onError:     _defaultOnError,
-		ignoreCtx:   _defaultIgnoreCtx,
+		maxAttempts:  _defaultMaxAttmpts,
+		backoff:      _defaultBackoff,
+		onError:      _defaultOnError,
+		ignoreCtx:    _defaultIgnoreCtx,
+		errorHandler: _defaultErrorHandler,
 	}
 }
 
@@ -44,5 +46,12 @@ func WithOnError(onError OnErrorFunc) RetrierOption {
 func WithIgnoreCtx(ignoreCtx bool) RetrierOption {
 	return func(r *Retrier) {
 		r.ignoreCtx = ignoreCtx
+	}
+}
+
+// WithPassThroughErrorHandler is an option to specify that the Retrier should return original error returned by the action
+func WithPassThroughErrorHandler() RetrierOption {
+	return func(r *Retrier) {
+		r.errorHandler = func(retrierErr, actionErr error) error { return actionErr }
 	}
 }
