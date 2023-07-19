@@ -3,8 +3,9 @@ package trytryagain
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_IsCanceledContextError(t *testing.T) {
@@ -14,6 +15,7 @@ func Test_IsCanceledContextError(t *testing.T) {
 		`Get "https://www.blah.com/something": context canceled`:                                                         true,
 		`context deadline exceeded`: true,
 		`not found`:                 false,
+		ErrContextCanceled.Error():  true,
 	}
 
 	for testcase, expected := range testcases {
