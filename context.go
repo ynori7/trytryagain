@@ -8,7 +8,9 @@ import (
 // IsCanceledContextError returns true if the error is some variant of "context canceled" or "context deadline exceeded"
 func IsCanceledContextError(err error) bool {
 	errLower := strings.ToLower(err.Error())
-	return strings.Contains(errLower, context.Canceled.Error()) || strings.Contains(errLower, context.DeadlineExceeded.Error())
+	return strings.Contains(errLower, context.Canceled.Error()) ||
+		strings.Contains(errLower, context.DeadlineExceeded.Error()) ||
+		strings.Contains(errLower, ErrContextCanceled.Error())
 }
 
 // IsContextDone returns true if the context is done
